@@ -1,9 +1,9 @@
 [project]
-name = "react-agent"
+name = "dev-ops-agent"
 version = "0.0.1"
-description = "Starter template for making a custom Reasoning and Action agent (using tool calling) in LangGraph."
+description = "An agnet help us DevOps"
 authors = [
-    { name = "William Fu-Hinthorn", email = "13333726+hinthornw@users.noreply.github.com" },
+    { name = "nie.chao", email = "niechao158@gmail.com" },
 ]
 readme = "README.md"
 license = { text = "MIT" }
@@ -23,6 +23,8 @@ dependencies = [
     "python-jose>=3.5.0",
     "cryptography>=46.0.7",
     "psycopg-pool>=3.3.1",
+    "langgraph-checkpoint-postgres>=3.1.0",
+    "langchain-google-genai>=4.2.2",
 ]
 
 
@@ -34,10 +36,9 @@ requires = ["setuptools>=73.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["langgraph.templates.react_agent", "react_agent"]
+packages = ["dev_ops_agent"]
 [tool.setuptools.package-dir]
-"langgraph.templates.react_agent" = "src/react_agent"
-"react_agent" = "src/react_agent"
+"dev_ops_agent" = "src/dev_ops_agent"
 
 
 [tool.setuptools.package-data]
