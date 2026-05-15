@@ -1,0 +1,149 @@
+'use client';
+
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+
+import { getChatHistory, getConversationList, sendMessage } from '@/services/chat';
+import { ChatMessage, ChatConversation, ChatReq } from '@/types/chat';
+
+
+export const chatKeys = {
+  temp_ai: 'temp-ai' as const,
+  temp_user: 'temp-user' as const,
+  all: [ 'chat' ] as const,
+  conversations: () => [ ...chatKeys.all, 'conversations' ] as const,
+  histories: () => [ ...chatKeys.all, 'history' ] as const,
+  history: (conversation_id: string) => [ ...chatKeys.histories(), conversation_id ] as const,
+};
+
+
+export function useConversations() {
+  return useQuery({
+    queryKey: chatKeys.conversations(),
+    queryFn: () => getConversationList().then(res => res.data),
+  });
+}
+
+
+export function useHistory(conversation_id: string) {
+  return useQuery({
+    queryKey: chatKeys.history(conversation_id),
+    queryFn: () => getChatHistory(conversation_id).then(res => res.data),
+    enabled: !!conversation_id,
+    // 可选：如果希望进入页面时数据是最新的，可以设置
+    staleTime: 1000 * 30, // 30秒内认为数据是新鲜的
+  });
+}
+
+
+export function useChatAction() {
+  const queryClient = useQueryClient();
+
+  const sendMsg = useMutation({
+    mutationFn: ({ req, onChunk, onFinished, onConversationCreated }: {
+      req: ChatReq;
+      onChunk: (content: string, node?: string) => void;
+      onFinished?: () => void;
+      onError?: () => void;
+      onConversationCreated?: (conversation_id: string) => void;
+    }) => {
+      const { conversation_id } = req;
+      let finalConversationId = conversation_id;
+
+      const onDone = async () => {
+        // 对话完成后，刷新历史
+        if (finalConversationId) {
+          await queryClient.invalidateQueries({ queryKey: chatKeys.history(finalConversationId) });
+        }
+
+        // 对话完成后，刷新侧边栏
+        await queryClient.invalidateQueries({ queryKey: chatKeys.conversations() });
+
+        // 执行调用方传入的成功回调
+        onFinished?.();
+      };
+
+      const handleConversationCreated = (newConversationId: string) => {
+        finalConversationId = newConversationId;
+        onConversationCreated?.(newConversationId);
+      };
+
+      return sendMessage(req, onChunk, onDone, handleConversationCreated);
+    },
+    onMutate: async ({ req }) => {
+      const { conversation_id, query } = req;
+      const optimisticConversationId = conversation_id || '';
+
+      // 乐观更新侧边栏
+      await queryClient.cancelQueries({ queryKey: chatKeys.conversations() });
+      const previousConversations = queryClient.getQueryData<ChatConversation[]>(chatKeys.conversations());
+      queryClient.setQueryData<ChatConversation[]>(chatKeys.conversations(), (old) => {
+        const oldList = Array.isArray(old) ? old : [];
+
+        // 旧对话逻辑，将该对话置顶
+        if (conversation_id) {
+          const exists = oldList.find(t => t.conversation_id === conversation_id);
+          if (exists) {
+            const filtered = oldList.filter(t => t.conversation_id !== conversation_id);
+            return [exists, ...filtered];
+          }
+        }
+
+        // 新对话逻辑，加入临时对话
+        const optimisticConversation: ChatConversation = {
+          conversation_id: optimisticConversationId,
+          summary: query, // 标题为首条消息
+          last_message_id: new Date().toISOString()
+        };
+        return [ optimisticConversation, ...oldList ];
+      });
+
+      // 历史记录乐观更新
+      await queryClient.cancelQueries({ queryKey: chatKeys.history(optimisticConversationId) });
+      const previousHistory = queryClient.getQueryData<ChatMessage[]>(chatKeys.history(optimisticConversationId));
+
+      const userMsg: ChatMessage = {
+        message_id: chatKeys.temp_user,
+        role: 'user',
+        content: query
+      };
+      const aiMsg: ChatMessage = {
+        message_id: chatKeys.temp_ai,
+        role: 'ai',
+        content: '' // 初始为空，由 onChunk 更新
+      };
+      queryClient.setQueryData<ChatMessage[]>(chatKeys.history(optimisticConversationId), (old) => {
+        const list = old ?? [];
+        // 检查是否已经存在 temp 消息，避免重复添加
+        const hasUserTemp = list.some(m => m.message_id === chatKeys.temp_user);
+        const hasAiTemp = list.some(m => m.message_id === chatKeys.temp_ai);
+        if (hasUserTemp || hasAiTemp) {
+          // 如果已经存在，说明可能是并发调用，直接返回原列表或更新 AI 内容为空
+          return list;
+        }
+        return [ ...list, userMsg, aiMsg ];
+      });
+      return { previousConversations, previousHistory, optimisticConversationId };
+    },
+    onError: (error, variables, context) => {
+      console.error(error);
+      const { onError } = variables;
+
+      // 1. 回滚侧边栏
+      if (context?.previousConversations) {
+        queryClient.setQueryData(chatKeys.conversations(), context.previousConversations);
+      }
+
+      // 2. 回滚历史记录
+      if (context?.previousHistory && variables.req.conversation_id) {
+        queryClient.setQueryData(chatKeys.history(variables.req.conversation_id), context.previousHistory);
+      }
+
+      // 3. 执行回调
+      onError?.();
+    }
+  });
+
+  return {
+    sendMsg,
+  };
+}
