@@ -1,9 +1,12 @@
-from fastapi import HTTPException, Header, status
-from typing import Annotated
+from fastapi import Depends, HTTPException, Header, status
+from typing import Annotated, List
 from pydantic import ValidationError
 
-from src.schemas.auth import TokenDict
+from src.schemas.auth import TokenDict, UserRole
 from src.utils.jwt import verify_access_token
+
+
+ALLOW_ROLE: List[UserRole] = [UserRole.ADMIN]
 
 
 async def get_current_user(
@@ -33,3 +36,13 @@ async def get_current_user(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token data corrupted"
         )
+
+
+async def get_current_admin(
+        current_user: Annotated[TokenDict, Depends(get_current_user)]
+) -> TokenDict:
+    if current_user.role not in ALLOW_ROLE:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail=f"Permission denied. Required roles: {ALLOW_ROLE}")
+    return current_user

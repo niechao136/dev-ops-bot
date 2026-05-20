@@ -1,19 +1,21 @@
 'use client';
 
+import TerminalIcon from '@mui/icons-material/Terminal';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import Checkbox from '@mui/material/Checkbox';
+import Container from '@mui/material/Container';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import IconButton from '@mui/material/IconButton';
+import InputAdornment from '@mui/material/InputAdornment';
+import Paper from '@mui/material/Paper';
+import TextField from '@mui/material/TextField';
+import Typography from '@mui/material/Typography';
+
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Visibility, VisibilityOff, Terminal as TerminalIcon } from '@mui/icons-material';
-import {
-  Box,
-  Button,
-  Checkbox,
-  Container,
-  FormControlLabel,
-  TextField,
-  Typography,
-  Paper,
-  InputAdornment,
-  IconButton,
-} from '@mui/material';
 import { useSnackbar } from 'notistack';
 import { useEffect, useState } from 'react';
 import { useForm, Controller } from 'react-hook-form';
@@ -166,7 +168,7 @@ export default function LoginPage() {
                             onClick={() => setShowPassword(prevState => !prevState)}
                             edge="end"
                           >
-                            {showPassword ? <VisibilityOff/> : <Visibility/>}
+                            {showPassword ? <VisibilityOffIcon/> : <VisibilityIcon/>}
                           </IconButton>
                         </InputAdornment>
                       )

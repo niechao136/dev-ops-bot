@@ -12,6 +12,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.auth import auth_router
 from src.api.chat import chat_router
+from src.api.user import user_router
 from src.database.checkpointer import get_checkpointer
 from src.database.postgre import init_pool, close_pool, init_db
 
@@ -41,6 +42,7 @@ app.add_middleware(
 
 app.include_router(router=auth_router)
 app.include_router(router=chat_router)
+app.include_router(router=user_router)
 
 
 def patch_windows_loop():
